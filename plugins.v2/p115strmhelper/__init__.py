@@ -48,7 +48,7 @@ from orjson import dumps, loads
 from p115client import P115Client
 from p115client.exception import DataError
 from p115client.tool.fs_files import iter_fs_files
-from p115client.tool.iterdir import iter_files_with_path, get_path_to_cid, share_iterdir
+from p115client.tool.iterdir import iter_files_with_path, share_iterdir
 from p115client.tool.life import iter_life_behavior_once, life_show
 from p115client.tool.util import share_extract_payload
 from p115rsacipher import encrypt, decrypt
@@ -79,6 +79,57 @@ from .views import ViewRenderer
 session_manager = BaseSessionManager(session_class=Session)
 
 directory_upload_dict = defaultdict(threading.Lock)
+
+
+def get_path_to_cid(client, cid):
+    """
+    替代原来的 get_path_to_cid 函数
+    通过 P115Client 获取指定 cid 的路径
+    """
+    try:
+        # 使用 fs_files 接口获取文件信息
+        response = client.fs_files(cid=cid, show_dir=1, limit=1)
+        if response and response.get("state"):
+            data = response.get("data", [])
+            if data:
+                # 获取第一个文件/目录的路径信息
+                file_info = data[0]
+                path_parts = []
+
+                # 构建路径
+                current_cid = cid
+                while current_cid and current_cid != 0:
+                    # 获取当前目录信息
+                    dir_response = client.fs_files(cid=current_cid, show_dir=1, limit=1)
+                    if dir_response and dir_response.get("state"):
+                        dir_data = dir_response.get("data", [])
+                        if dir_data:
+                            dir_info = dir_data[0]
+                            path_parts.insert(0, dir_info.get("name", ""))
+                            current_cid = dir_info.get("cid", 0)
+                        else:
+                            break
+                    else:
+                        break
+
+                # 返回完整路径
+                if path_parts:
+                    return "/" + "/".join(path_parts)
+                else:
+                    return "/"
+
+        # 如果上述方法失败，尝试使用 fs_info 接口
+        info_response = client.fs_info(file_id=cid)
+        if info_response and info_response.get("state"):
+            file_data = info_response.get("data", [])
+            if file_data:
+                file_info = file_data[0]
+                return file_info.get("path", "/")
+
+        return "/"
+    except Exception as e:
+        # 如果所有方法都失败，返回根路径
+        return "/"
 
 
 class FileMonitorHandler(FileSystemEventHandler):
