@@ -11,7 +11,35 @@ from sqlalchemy.orm import (
 )
 
 from app.core.config import settings
-from app.db import get_args_db, update_args_db
+
+
+def get_args_db(args, kwargs):
+    """
+    从函数参数中获取数据库会话
+    """
+    # 检查 kwargs 中是否有 db 参数
+    if 'db' in kwargs and kwargs['db'] is not None:
+        return kwargs['db']
+
+    # 检查 args 中的第一个参数是否是数据库会话
+    if args and hasattr(args[0], 'query'):
+        return args[0]
+
+    return None
+
+
+def update_args_db(args, kwargs, db):
+    """
+    更新函数参数中的数据库会话
+    """
+    # 如果 kwargs 中有 db 参数，更新它
+    if 'db' in kwargs:
+        kwargs['db'] = db
+        return args, kwargs
+
+    # 否则，将 db 添加到 kwargs 中
+    kwargs['db'] = db
+    return args, kwargs
 
 
 class __DBManager:
